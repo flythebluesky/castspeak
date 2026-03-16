@@ -29,18 +29,19 @@ func PrintUsage() {
 	fmt.Fprintln(os.Stderr, usage)
 }
 
-// deviceFlags adds the common --device, --uuid, and --timeout flags to a FlagSet.
-func deviceFlags(fs *flag.FlagSet) (device, uuid *string, timeout *int) {
+// deviceFlags adds the common --device, --uuid, --host, and --timeout flags to a FlagSet.
+func deviceFlags(fs *flag.FlagSet) (device, uuid, host *string, timeout *int) {
 	device = fs.String("device", "", "Device name")
 	uuid = fs.String("uuid", "", "Device UUID")
+	host = fs.String("host", "", "Device address as host or host:port (skips mDNS discovery, default port 8009)")
 	timeout = fs.Int("timeout", 5, "Discovery timeout in seconds")
 	return
 }
 
-// requireDevice exits with an error if neither --device nor --uuid is set.
-func requireDevice(fs *flag.FlagSet, device, uuid string) {
-	if device == "" && uuid == "" {
-		fmt.Fprintln(os.Stderr, "Error: --device or --uuid is required")
+// requireDevice exits with an error if no device identifier is set.
+func requireDevice(fs *flag.FlagSet, device, uuid, host string) {
+	if device == "" && uuid == "" && host == "" {
+		fmt.Fprintln(os.Stderr, "Error: --device, --uuid, or --host is required")
 		fs.Usage()
 		os.Exit(1)
 	}
@@ -80,7 +81,7 @@ func RunDevices(args []string) error {
 
 func RunSpeak(args []string) error {
 	fs := flag.NewFlagSet("speak", flag.ExitOnError)
-	device, uuid, timeout := deviceFlags(fs)
+	device, uuid, host, timeout := deviceFlags(fs)
 	text := fs.String("text", "", "Text to speak (required)")
 	language := fs.String("language", "en", "Language code")
 	fs.Parse(args)
@@ -90,12 +91,12 @@ func RunSpeak(args []string) error {
 		fs.Usage()
 		os.Exit(1)
 	}
-	requireDevice(fs, *device, *uuid)
+	requireDevice(fs, *device, *uuid, *host)
 
 	ctx, cancel := timeoutCtx(*timeout)
 	defer cancel()
 
-	deviceName, chunks, err := speak.Speak(ctx, *text, *device, *uuid, *language)
+	deviceName, chunks, err := speak.Speak(ctx, *text, *device, *uuid, *host, *language)
 	if err != nil {
 		return err
 	}
@@ -106,11 +107,11 @@ func RunSpeak(args []string) error {
 
 func RunVolume(args []string) error {
 	fs := flag.NewFlagSet("volume", flag.ExitOnError)
-	device, uuid, timeout := deviceFlags(fs)
+	device, uuid, host, timeout := deviceFlags(fs)
 	level := fs.Float64("level", -1, "Volume level 0.0–1.0 (required)")
 	fs.Parse(args)
 
-	requireDevice(fs, *device, *uuid)
+	requireDevice(fs, *device, *uuid, *host)
 	if *level < 0 || *level > 1 {
 		fmt.Fprintln(os.Stderr, "Error: --level must be between 0.0 and 1.0")
 		fs.Usage()
@@ -120,7 +121,7 @@ func RunVolume(args []string) error {
 	ctx, cancel := timeoutCtx(*timeout)
 	defer cancel()
 
-	if err := speak.SetVolume(ctx, *device, *uuid, float32(*level)); err != nil {
+	if err := speak.SetVolume(ctx, *device, *uuid, *host, float32(*level)); err != nil {
 		return err
 	}
 	fmt.Printf("Volume set to %.0f%%\n", *level*100)
@@ -136,15 +137,15 @@ func RunMute(args []string, muted bool) error {
 	}
 
 	fs := flag.NewFlagSet(name, flag.ExitOnError)
-	device, uuid, timeout := deviceFlags(fs)
+	device, uuid, host, timeout := deviceFlags(fs)
 	fs.Parse(args)
 
-	requireDevice(fs, *device, *uuid)
+	requireDevice(fs, *device, *uuid, *host)
 
 	ctx, cancel := timeoutCtx(*timeout)
 	defer cancel()
 
-	if err := speak.SetMuted(ctx, *device, *uuid, muted); err != nil {
+	if err := speak.SetMuted(ctx, *device, *uuid, *host, muted); err != nil {
 		return err
 	}
 	fmt.Printf("%s device\n", action)
@@ -153,15 +154,15 @@ func RunMute(args []string, muted bool) error {
 
 func RunStop(args []string) error {
 	fs := flag.NewFlagSet("stop", flag.ExitOnError)
-	device, uuid, timeout := deviceFlags(fs)
+	device, uuid, host, timeout := deviceFlags(fs)
 	fs.Parse(args)
 
-	requireDevice(fs, *device, *uuid)
+	requireDevice(fs, *device, *uuid, *host)
 
 	ctx, cancel := timeoutCtx(*timeout)
 	defer cancel()
 
-	if err := speak.Stop(ctx, *device, *uuid); err != nil {
+	if err := speak.Stop(ctx, *device, *uuid, *host); err != nil {
 		return err
 	}
 	fmt.Println("Stopped")
@@ -170,15 +171,15 @@ func RunStop(args []string) error {
 
 func RunStatus(args []string) error {
 	fs := flag.NewFlagSet("status", flag.ExitOnError)
-	device, uuid, timeout := deviceFlags(fs)
+	device, uuid, host, timeout := deviceFlags(fs)
 	fs.Parse(args)
 
-	requireDevice(fs, *device, *uuid)
+	requireDevice(fs, *device, *uuid, *host)
 
 	ctx, cancel := timeoutCtx(*timeout)
 	defer cancel()
 
-	deviceName, status, err := speak.Status(ctx, *device, *uuid)
+	deviceName, status, err := speak.Status(ctx, *device, *uuid, *host)
 	if err != nil {
 		return err
 	}
@@ -199,11 +200,11 @@ func RunStatus(args []string) error {
 
 func RunPlay(args []string) error {
 	fs := flag.NewFlagSet("play", flag.ExitOnError)
-	device, uuid, timeout := deviceFlags(fs)
+	device, uuid, host, timeout := deviceFlags(fs)
 	url := fs.String("url", "", "Media URL to play (required)")
 	fs.Parse(args)
 
-	requireDevice(fs, *device, *uuid)
+	requireDevice(fs, *device, *uuid, *host)
 	if *url == "" {
 		fmt.Fprintln(os.Stderr, "Error: --url is required")
 		fs.Usage()
@@ -213,7 +214,7 @@ func RunPlay(args []string) error {
 	ctx, cancel := timeoutCtx(*timeout)
 	defer cancel()
 
-	if err := speak.PlayURL(ctx, *device, *uuid, *url); err != nil {
+	if err := speak.PlayURL(ctx, *device, *uuid, *host, *url); err != nil {
 		return err
 	}
 	fmt.Println("Playing")

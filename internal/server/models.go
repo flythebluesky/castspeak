@@ -19,6 +19,7 @@ type SpeakRequest struct {
 	Text       string `json:"text"`
 	DeviceName string `json:"device_name"`
 	DeviceUUID string `json:"device_uuid"`
+	Host       string `json:"host"`
 	Language   string `json:"language"`
 }
 

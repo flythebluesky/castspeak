@@ -50,7 +50,7 @@ func handleSpeak(w http.ResponseWriter, r *http.Request) {
 
 	// Use the request context directly — the chi Timeout middleware (60s) is the ceiling.
 	// Discovery + cast playback can take longer than the 5s discovery timeout.
-	deviceName, chunks, err := speak.Speak(r.Context(), req.Text, req.DeviceName, req.DeviceUUID, req.Language)
+	deviceName, chunks, err := speak.Speak(r.Context(), req.Text, req.DeviceName, req.DeviceUUID, req.Host, req.Language)
 	if err != nil {
 		log.Printf("speak error: %v", err)
 		writeJSON(w, http.StatusInternalServerError, ErrorResponse{Error: err.Error()})

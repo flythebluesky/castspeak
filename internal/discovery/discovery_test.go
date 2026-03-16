@@ -40,6 +40,65 @@ func TestDevice_HostPort(t *testing.T) {
 	}
 }
 
+func TestDeviceFromHost(t *testing.T) {
+	tests := []struct {
+		name     string
+		host     string
+		wantAddr string
+		wantPort int
+		wantErr  bool
+	}{
+		{
+			name:     "ip with port",
+			host:     "192.168.86.248:8009",
+			wantAddr: "192.168.86.248",
+			wantPort: 8009,
+		},
+		{
+			name:     "ip without port defaults to 8009",
+			host:     "192.168.86.248",
+			wantAddr: "192.168.86.248",
+			wantPort: 8009,
+		},
+		{
+			name:     "custom port",
+			host:     "10.0.0.1:9000",
+			wantAddr: "10.0.0.1",
+			wantPort: 9000,
+		},
+		{
+			name:     "hostname with port",
+			host:     "mydevice.local:8009",
+			wantAddr: "mydevice.local",
+			wantPort: 8009,
+		},
+		{
+			name:     "hostname without port",
+			host:     "mydevice.local",
+			wantAddr: "mydevice.local",
+			wantPort: 8009,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dev, err := DeviceFromHost(tt.host)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("DeviceFromHost(%q) error = %v, wantErr %v", tt.host, err, tt.wantErr)
+			}
+			if err != nil {
+				return
+			}
+			if dev.Addr != tt.wantAddr {
+				t.Errorf("Addr = %q, want %q", dev.Addr, tt.wantAddr)
+			}
+			if dev.Port != tt.wantPort {
+				t.Errorf("Port = %d, want %d", dev.Port, tt.wantPort)
+			}
+		})
+	}
+}
+
 func TestDeviceFromEntry(t *testing.T) {
 	entry := dns.CastEntry{
 		AddrV4:     net.ParseIP("192.168.1.100"),
