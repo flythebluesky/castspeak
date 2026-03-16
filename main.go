@@ -15,6 +15,8 @@ import (
 	"castspeak/internal/server"
 )
 
+var version = "dev"
+
 func main() {
 	if len(os.Args) < 2 {
 		cli.PrintUsage()
@@ -44,6 +46,9 @@ func main() {
 		err = cli.RunStatus(args)
 	case "play":
 		err = cli.RunPlay(args)
+	case "version", "--version", "-v":
+		fmt.Println(version)
+		return
 	case "--help", "-h", "help":
 		cli.PrintUsage()
 		return

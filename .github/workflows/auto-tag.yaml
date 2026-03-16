@@ -1,0 +1,36 @@
+name: Auto Tag
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Get latest tag and bump patch
+        id: bump
+        run: |
+          LATEST=$(git tag --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -1)
+          if [ -z "$LATEST" ]; then
+            NEXT="v1.0.0"
+          else
+            MAJOR=$(echo "$LATEST" | cut -d. -f1)
+            MINOR=$(echo "$LATEST" | cut -d. -f2)
+            PATCH=$(echo "$LATEST" | cut -d. -f3)
+            NEXT="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          fi
+          echo "tag=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "Bumping $LATEST → $NEXT"
+
+      - name: Create and push tag
+        run: |
+          git tag ${{ steps.bump.outputs.tag }}
+          git push origin ${{ steps.bump.outputs.tag }}
