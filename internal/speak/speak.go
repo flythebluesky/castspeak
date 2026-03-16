@@ -17,9 +17,9 @@ func ListDevices(ctx context.Context) ([]discovery.Device, error) {
 	return discovery.Discover(ctx)
 }
 
-// Speak discovers a device by name or UUID, builds TTS URLs, and casts them.
+// Speak discovers a device by name, UUID, or host address, builds TTS URLs, and casts them.
 // Returns the device name used and the number of chunks played.
-func Speak(ctx context.Context, text, deviceName, deviceUUID, language string) (string, int, error) {
+func Speak(ctx context.Context, text, deviceName, deviceUUID, host, language string) (string, int, error) {
 	if text == "" {
 		return "", 0, fmt.Errorf("text is required")
 	}
@@ -32,7 +32,7 @@ func Speak(ctx context.Context, text, deviceName, deviceUUID, language string) (
 		return "", 0, fmt.Errorf("tts: %w", err)
 	}
 
-	device, err := findDevice(ctx, deviceName, deviceUUID)
+	device, err := findDevice(ctx, deviceName, deviceUUID, host)
 	if err != nil {
 		return "", 0, err
 	}
@@ -44,17 +44,21 @@ func Speak(ctx context.Context, text, deviceName, deviceUUID, language string) (
 	return device.Name, len(urls), nil
 }
 
-// findDevice is a helper that resolves a device by name or UUID.
-func findDevice(ctx context.Context, deviceName, deviceUUID string) (discovery.Device, error) {
+// findDevice resolves a device by host, name, or UUID.
+// If host is provided, mDNS discovery is skipped entirely.
+func findDevice(ctx context.Context, deviceName, deviceUUID, host string) (discovery.Device, error) {
+	if host != "" {
+		return discovery.DeviceFromHost(host)
+	}
 	if deviceName == "" && deviceUUID == "" {
-		return discovery.Device{}, fmt.Errorf("device_name or device_uuid is required")
+		return discovery.Device{}, fmt.Errorf("device_name, device_uuid, or host is required")
 	}
 	return discovery.FindDevice(ctx, deviceName, deviceUUID)
 }
 
 // SetVolume discovers a device and sets its volume (0.0–1.0).
-func SetVolume(ctx context.Context, deviceName, deviceUUID string, level float32) error {
-	device, err := findDevice(ctx, deviceName, deviceUUID)
+func SetVolume(ctx context.Context, deviceName, deviceUUID, host string, level float32) error {
+	device, err := findDevice(ctx, deviceName, deviceUUID, host)
 	if err != nil {
 		return err
 	}
@@ -62,8 +66,8 @@ func SetVolume(ctx context.Context, deviceName, deviceUUID string, level float32
 }
 
 // SetMuted discovers a device and sets its mute state.
-func SetMuted(ctx context.Context, deviceName, deviceUUID string, muted bool) error {
-	device, err := findDevice(ctx, deviceName, deviceUUID)
+func SetMuted(ctx context.Context, deviceName, deviceUUID, host string, muted bool) error {
+	device, err := findDevice(ctx, deviceName, deviceUUID, host)
 	if err != nil {
 		return err
 	}
@@ -71,8 +75,8 @@ func SetMuted(ctx context.Context, deviceName, deviceUUID string, muted bool) er
 }
 
 // Stop discovers a device and stops any active media.
-func Stop(ctx context.Context, deviceName, deviceUUID string) error {
-	device, err := findDevice(ctx, deviceName, deviceUUID)
+func Stop(ctx context.Context, deviceName, deviceUUID, host string) error {
+	device, err := findDevice(ctx, deviceName, deviceUUID, host)
 	if err != nil {
 		return err
 	}
@@ -80,8 +84,8 @@ func Stop(ctx context.Context, deviceName, deviceUUID string) error {
 }
 
 // Status discovers a device and returns its current status.
-func Status(ctx context.Context, deviceName, deviceUUID string) (string, cast.DeviceStatus, error) {
-	device, err := findDevice(ctx, deviceName, deviceUUID)
+func Status(ctx context.Context, deviceName, deviceUUID, host string) (string, cast.DeviceStatus, error) {
+	device, err := findDevice(ctx, deviceName, deviceUUID, host)
 	if err != nil {
 		return "", cast.DeviceStatus{}, err
 	}
@@ -93,8 +97,8 @@ func Status(ctx context.Context, deviceName, deviceUUID string) (string, cast.De
 }
 
 // PlayURL discovers a device and plays an arbitrary media URL.
-func PlayURL(ctx context.Context, deviceName, deviceUUID, url string) error {
-	device, err := findDevice(ctx, deviceName, deviceUUID)
+func PlayURL(ctx context.Context, deviceName, deviceUUID, host, url string) error {
+	device, err := findDevice(ctx, deviceName, deviceUUID, host)
 	if err != nil {
 		return err
 	}

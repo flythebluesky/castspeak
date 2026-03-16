@@ -68,6 +68,26 @@ func (d Device) HostPort() string {
 	return net.JoinHostPort(addr, strconv.Itoa(d.Port))
 }
 
+// DeviceFromHost creates a Device directly from a host:port string,
+// bypassing mDNS discovery. Defaults to port 8009 if not specified.
+func DeviceFromHost(host string) (Device, error) {
+	h, p, err := net.SplitHostPort(host)
+	if err != nil {
+		// No port specified — default to 8009
+		h = host
+		p = "8009"
+	}
+	port, err := strconv.Atoi(p)
+	if err != nil {
+		return Device{}, fmt.Errorf("invalid port in host %q: %w", host, err)
+	}
+	return Device{
+		Name: h,
+		Addr: h,
+		Port: port,
+	}, nil
+}
+
 func deviceFromEntry(e dns.CastEntry) Device {
 	return Device{
 		Name:  e.GetName(),
