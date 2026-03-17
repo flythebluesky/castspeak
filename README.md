@@ -20,6 +20,14 @@ go build -o castspeak .
 # List Cast devices on your network
 castspeak devices
 
+# Scan for devices without mDNS (useful when mDNS is blocked)
+castspeak scan --timeout 15
+castspeak scan --timeout 15 --save   # save results for offline use
+
+# View/manage saved devices
+castspeak devices saved
+castspeak devices forget
+
 # Speak on a device
 castspeak speak --device "Living Room speaker" --text "Dinner is ready"
 
@@ -89,7 +97,7 @@ curl -X POST http://localhost:8080/speak \
 
 ## How It Works
 
-1. Discovers Cast devices on the local network via mDNS
+1. Discovers Cast devices on the local network via mDNS, falling back to saved devices when mDNS is blocked (e.g. by CrowdStrike Falcon). Use `castspeak scan --save` to populate saved devices via TCP port scan.
 2. Builds Google Translate TTS URLs, splitting long text into ~200-character chunks at sentence boundaries
 3. Connects to the target device over the CASTv2 protocol (TLS on port 8009) and plays each chunk sequentially
 

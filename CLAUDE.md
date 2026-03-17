@@ -13,23 +13,25 @@ go vet ./...
 ## Architecture
 
 ```
-main.go              # CLI entrypoint — subcommand dispatch (serve, speak, devices, volume, etc.)
+main.go              # CLI entrypoint — subcommand dispatch (serve, speak, devices, scan, volume, etc.)
 internal/
   tts/               # Pure logic: Google Translate TTS URL builder + text chunking
-  discovery/         # Wraps go-chromecast/dns for mDNS device discovery
+  discovery/         # mDNS device discovery + device persistence (store.go → ~/.config/castspeak/devices.json)
+  scan/              # TCP port 8009 scan + HTTP 8008 eureka_info fetch — mDNS-free discovery
   cast/              # Wraps go-chromecast/application for CASTv2 connection + playback
-  speak/             # Shared orchestration layer — discovery + TTS + cast, used by both CLI and HTTP
+  speak/             # Shared orchestration layer — discovery + scan + TTS + cast, used by both CLI and HTTP
   server/            # Chi HTTP router, handlers, JSON models
   cli/               # CLI flag parsing + subcommand runners
 ```
 
-**Data flow:** `cli` or `server` → `speak` (orchestration) → `tts` + `discovery` + `cast`
+**Data flow:** `cli` or `server` → `speak` (orchestration) → `tts` + `discovery` + `scan` + `cast`
 
 ## Key Conventions
 
-- **No device cache** — fresh mDNS discovery per request. Avoids stale data from DHCP/power changes.
+- **Fallback discovery chain** — `--host` (direct) → mDNS → saved devices. When mDNS is blocked (e.g. CrowdStrike Falcon), the system falls back to `~/.config/castspeak/devices.json` with a warning that addresses may be stale.
+- **Network scan** — `castspeak scan` finds Cast devices via TCP port 8009 scan + HTTP 8008 `eureka_info`, bypassing mDNS entirely. Use `--save` to persist discovered devices.
 - **One cast connection per operation** — `withApp()` in `cast/cast.go` handles connect + defer close for all commands.
-- **`speak` package is the shared layer** — all business logic goes through `speak.*`, never call `discovery`/`cast`/`tts` directly from handlers or CLI.
+- **`speak` package is the shared layer** — all business logic goes through `speak.*`, never call `discovery`/`cast`/`tts`/`scan` directly from handlers or CLI.
 - All CLI subcommands use `flag.FlagSet` for consistent flag parsing.
 - Device targeting uses `--device` (name) or `--uuid` — at least one required.
 
@@ -42,5 +44,7 @@ internal/
 
 - `tts/` has 100% coverage — pure logic, most important to test thoroughly.
 - `server/` tested via `httptest` — handler routing, JSON parsing, error cases.
-- `discovery/`, `speak/` — validation and helper logic tested; network-dependent paths require real Cast devices.
+- `discovery/` — validation, helper logic, and device persistence (store) fully tested; mDNS paths require real Cast devices.
+- `scan/` — subnet enumeration, IP generation, and eureka_info parsing tested; actual port scanning requires real network.
+- `speak/` — validation and helper logic tested; fallback chain and network-dependent paths require real Cast devices.
 - `cast/` — connection tests hit real network; only type/edge-case tests run offline.

@@ -44,6 +44,8 @@ func main() {
 		err = cli.RunStop(args)
 	case "status":
 		err = cli.RunStatus(args)
+	case "scan":
+		err = cli.RunScan(args)
 	case "play":
 		err = cli.RunPlay(args)
 	case "version", "--version", "-v":
