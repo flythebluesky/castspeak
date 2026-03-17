@@ -12,11 +12,11 @@ import (
 
 // Device holds discovered Cast device information.
 type Device struct {
-	Name  string
-	UUID  string
-	Addr  string
-	Port  int
-	Model string
+	Name  string `json:"name"`
+	UUID  string `json:"uuid"`
+	Addr  string `json:"addr"`
+	Port  int    `json:"port"`
+	Model string `json:"model,omitempty"`
 }
 
 // Discover returns all Cast devices found on the local network within the

@@ -13,15 +13,18 @@ import (
 const usage = `Usage: castspeak <command> [flags]
 
 Commands:
-  serve     Start the HTTP server
-  speak     Speak text on a Cast device
-  devices   List Cast devices on the network
-  volume    Set device volume
-  mute      Mute a device
-  unmute    Unmute a device
-  stop      Stop media on a device
-  status    Show device status
-  play      Play an audio URL on a device
+  serve          Start the HTTP server
+  speak          Speak text on a Cast device
+  devices        List Cast devices on the network
+  devices saved  Show saved devices (no network)
+  devices forget Delete saved devices file
+  scan           Scan subnet for Cast devices (no mDNS)
+  volume         Set device volume
+  mute           Mute a device
+  unmute         Unmute a device
+  stop           Stop media on a device
+  status         Show device status
+  play           Play an audio URL on a device
 
 Run 'castspeak <command> --help' for command-specific flags.`
 
@@ -52,6 +55,16 @@ func timeoutCtx(seconds int) (context.Context, context.CancelFunc) {
 }
 
 func RunDevices(args []string) error {
+	// Handle subcommands
+	if len(args) > 0 {
+		switch args[0] {
+		case "saved":
+			return runDevicesSaved()
+		case "forget":
+			return runDevicesForget()
+		}
+	}
+
 	fs := flag.NewFlagSet("devices", flag.ExitOnError)
 	timeout := fs.Int("timeout", 5, "Discovery timeout in seconds")
 	fs.Parse(args)
@@ -69,12 +82,72 @@ func RunDevices(args []string) error {
 		return nil
 	}
 
+	printDevices(devices)
+	return nil
+}
+
+func runDevicesSaved() error {
+	devices, err := speak.LoadSavedDevices()
+	if err != nil {
+		return err
+	}
+	if len(devices) == 0 {
+		fmt.Println("No saved devices.")
+		return nil
+	}
+	printDevices(devices)
+	return nil
+}
+
+func runDevicesForget() error {
+	if err := speak.ForgetDevices(); err != nil {
+		return err
+	}
+	fmt.Println("Saved devices removed.")
+	return nil
+}
+
+func printDevices(devices []speak.Device) {
 	for _, d := range devices {
 		model := d.Model
 		if model == "" {
 			model = "unknown"
 		}
 		fmt.Printf("%-30s  %s:%d  %s  %s\n", d.Name, d.Addr, d.Port, d.UUID, model)
+	}
+}
+
+func RunScan(args []string) error {
+	fs := flag.NewFlagSet("scan", flag.ExitOnError)
+	timeout := fs.Int("timeout", 10, "Scan timeout in seconds")
+	save := fs.Bool("save", false, "Save discovered devices to config file")
+	fs.Parse(args)
+
+	ctx, cancel := timeoutCtx(*timeout)
+	defer cancel()
+
+	fmt.Println("Scanning local network for Cast devices...")
+	devices, err := speak.ScanDevices(ctx)
+	if err != nil {
+		return err
+	}
+
+	if len(devices) == 0 {
+		fmt.Println("No Cast devices found.")
+		return nil
+	}
+
+	printDevices(devices)
+
+	if *save {
+		if err := speak.SaveDevices(devices); err != nil {
+			return fmt.Errorf("save devices: %w", err)
+		}
+		path, err := speak.SavedDevicesPath()
+		if err != nil {
+			path = "(unknown path)"
+		}
+		fmt.Printf("Saved %d device(s) to %s\n", len(devices), path)
 	}
 	return nil
 }
